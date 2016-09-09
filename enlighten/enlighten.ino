@@ -1,3 +1,12 @@
+/*
+ * Notes:
+ * Relay shall be wired in parallel with physical switch for OR-logic.
+ * i.e. Automation system can control the lighting OR the user can force 
+ * the light on. To achieve this, we write LOW to the NO relay. 
+ * The alternative is a safety functionality via series connection for AND-logic.
+ * i.e. When the Automation system fails (blows up/ sets on fire), the light can 
+ * still be switch on or off regardless. We then write HIGH to the NC relay.
+ */
 // Date and time functions using a DS3231 RTC connected via I2C and Wire lib
 #include <Wire.h>
 #include "RTClib.h"
@@ -58,12 +67,6 @@ void loop () {
   
   int TimeToStop = stopTime.hour()*3600 + stopTime.minute() * 60 + stopTime.second();
   int TimeNow = now.hour()*3600 + now.minute() * 60 + now.second();
-
-//  Serial.print("Time to Stop: ");
-//  Serial.println(TimeToStop);
-//  Serial.print("Time Now: ");
-//  Serial.println(TimeNow);
-//  Serial.println();
   
   if ( TimeNow > TimeToStop ){
     
