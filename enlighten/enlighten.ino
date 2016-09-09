@@ -31,7 +31,14 @@ volatile byte state = LOW; //PIR STATE
 //Declare loop counter
 int i = 0;
 
+//Declare variables for debouncing
+const long debounceTime = 300; //millis
+volatile unsigned long lastMicros;
+
 DateTime stopTime;
+DateTime now;
+volatile long int TimeToStop = 0;
+volatile long int TimeNow = 0;
 
 void setup () {
 
@@ -57,7 +64,7 @@ void setup () {
 
    //Initialise Beeper Output Pin
    pinMode(beeperPin, OUTPUT);
-   beepFor(3);
+   beepFor(2);
    
    //Initialise Relay Output Pin
    pinMode(relayPin, OUTPUT);
@@ -67,10 +74,10 @@ void setup () {
    //Initialise PIR Sensor Input Pin
    pinMode(interruptPin, INPUT);
 
-   //Attach External Interrupt Pin to Interrupt Service Routine
-   attachInterrupt(digitalPinToInterrupt(interruptPin), ISR1, RISING);
-
    stopTime = rtc.now();
+   
+   //Attach External Interrupt Pin to Interrupt Service Routine
+   attachInterrupt(digitalPinToInterrupt(interruptPin), ISR0, RISING);
 
 }
 
@@ -82,51 +89,57 @@ void loop () {
     delay(1000);
 }
 
-void ISR1() {
+void ISR0 () {
   //Interrupt Service Routine, as triggered by external interrupt pin
-    detachInterrupt(digitalPinToInterrupt(interruptPin));
-  state = HIGH; //PIR detected motion and has triggered ISR
-  blinkFor(3); //blink LED to notify ISR triggered
-  Serial.println("Start of ISR");
-
-  //Store time stamp for reference
-  DateTime now = rtc.now();  
-
-  //Convert to seconds for comparison
-  long int TimeToStop = stopTime.hour()*3600 + stopTime.minute() * 60 + stopTime.second();
-  long int TimeNow = now.hour()*3600 + now.minute() * 60 + now.second();
-
-  if ( TimeNow > TimeToStop ){
+  // If-statement here is for software debouncing
+  if((long)( micros() - lastMicros) >= debounceTime*1000){
+      state = HIGH; //PIR detected motion and has triggered ISR
+      blinkFor(3); //blink LED to notify ISR triggered
+      
+      Serial.println(F("Start ISR"));
+      beepFor(1);
     
-      if ( state == HIGH ){
-        //If motion detected then latch relay closed
-        digitalWrite(relayPin, LOW);
-        stopTime = rtc.now() +  TimeSpan(0,0, DelayMins ,0);
-        //Serial.println("Set RELAY CLOSED");
+      //Store time stamp for reference
+      now = rtc.now();  
+    
+      //Convert to seconds for comparison
+      TimeToStop = stopTime.hour()*3600 + stopTime.minute() * 60 + stopTime.second();
+      TimeNow = now.hour()*3600 + now.minute() * 60 + now.second();
+
+      beepFor(1);
+    
+      if ( TimeNow > TimeToStop ){
+        
+          if ( state == HIGH ){
+            //If motion detected then latch relay closed
+            digitalWrite(relayPin, LOW);
+            stopTime = rtc.now() +  TimeSpan(0,0, DelayMins ,0);
+            //Serial.println("Set RELAY CLOSED");
+          }
+          else if ( state == LOW ) {
+            //If no motion present then latch relay open
+            digitalWrite(relayPin, HIGH);  
+            //Serial.println("Set RELAY OPEN");
+          }
+          else{/*cbf*/}
       }
-      else if ( state == LOW ) {
-        //If no motion present then latch relay open
-        digitalWrite(relayPin, HIGH);  
-        //Serial.println("Set RELAY OPEN");
-      }
-      else{/*cbf*/}
-  
+      else{ 
+          /*
+           * We haven't time-out
+           * But let's check if we're close to timing-out
+           * and give a warning if true.
+           * 10 second pre-heat.
+           */
+          if ( (TimeNow + 10) > TimeToStop ){
+              beepFor(2);
+          }
+          else{/*cbf*/}
+      }    
+    Serial.println(F("End of ISR"));
+    lastMicros = micros();
   }
-  else{ 
-      /*
-       * We haven't time-out
-       * But let's check if we're close to timing-out
-       * and give a warning if true.
-       * 10 second pre-heat.
-       */
-      if ( (TimeNow + 10) > TimeToStop ){
-          beepFor(2);
-      }
-      else{/*cbf*/}
-  }
-  Serial.println("End of ISR");
-  attachInterrupt(digitalPinToInterrupt(interruptPin), ISR1, RISING);
-}  // End ISR function
+  else{/*cbf*/}
+} //End of ISR0 Function
 
 void beepFor(int n){
   beeperState = LOW; //Force Start LOW
