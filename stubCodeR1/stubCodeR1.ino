@@ -7,14 +7,13 @@
  * i.e. When the Automation system fails (blows up/ sets on fire), the light can 
  * still be switch on or off regardless. We then write HIGH to the NC relay.
  */
-// Timer Interrupt Library
-#include <TimerOne.h>
- 
 // Date and time functions using a DS3231 RTC connected via I2C and Wire lib
 #include <Wire.h>
 #include "RTClib.h"
 
 RTC_DS3231 rtc;
+char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+
 
 //Set delay in minutes
 int DelayMins = 10;
@@ -38,13 +37,11 @@ int i = 0;
 const long debounceTime = 300; //millis
 volatile unsigned long lastMicros;
 
-//Declare Flags for ISR
-int stopTimeFlag = 0;
-
 DateTime stopTime;
 DateTime now;
 volatile long int TimeToStop = 0;
 volatile long int TimeNow = 0;
+int flag = 0;
 
 void setup () {
 
@@ -81,88 +78,42 @@ void setup () {
    pinMode(interruptPin, INPUT);
 
    stopTime = rtc.now();
-
-   //Attach Timer Interrupt
-   Timer1.initialize(2500000); // handle is Period in microseconds
-   Timer1.attachInterrupt(TISR); //Timer Interrupt Service Routine
+   
    //Attach External Interrupt Pin to Interrupt Service Routine
    attachInterrupt(digitalPinToInterrupt(interruptPin), ISR0, RISING);
+
 }
 
 
 
 void loop () {
-    /*
-     * RTClib functions can not be directly called from ISR
-     * Need to use flags
-     * GG, no power saving
-     */
-    
-//    Serial.println(digitalRead(interruptPin));
+    /*derp*/
 
-    //Set time stamp for reference
-    now = rtc.now();  
-    //Convert to seconds for comparison
-    TimeNow = now.hour()*3600 + now.minute() * 60 + now.second();
-
-    if (stopTimeFlag){
-      state = HIGH;
-      //Set time-stamp for when to stop
-      stopTime = rtc.now() +  TimeSpan(0,0, DelayMins ,0);
-      //Convert to seconds for comparison
-      TimeToStop = stopTime.hour()*3600 + stopTime.minute() * 60 + stopTime.second();
-      stopTimeFlag = 0;
+    if (flag){
+      stuff();
+      flag = 0;
     }
-    else{
-
-      state = LOW;
-      
-    }
+    else{}
     
     delay(1000);
 }
-
-void TISR () {
-
-  if ( (TimeNow > TimeToStop) && (state == LOW) ){        
-    //Latch relay open i.e. lights off
-    digitalWrite(relayPin, HIGH);  
-  }
-  else if ( (TimeNow + 10) > TimeToStop ) {
-    /*
-    * If elapsed time is 10 seconds from
-    * the stop-time, sound a warning
-    */    
-    beepFor(2);
-  }
-  else{}   
-  
-} // End of TISR
 
 void ISR0 () {
   //Interrupt Service Routine, as triggered by external interrupt pin
   // If-statement here is for software debouncing
   if((long)( micros() - lastMicros) >= debounceTime*1000){
-         
+      state = HIGH; //PIR detected motion and has triggered ISR
       blinkFor(3); //blink LED to notify ISR triggered
       
-//      Serial.println(F("ISR triggered"));
+      Serial.println(F("Start ISR"));
+      beepFor(1);
 
-      /*
-       * We then want to know if the Light is already on.
-       * i.e. if they are already on, then we don't need to 
-       * digitalWrite to it; just reset the stop-time (flag).
-       */
-        if ( state == LOW ){         
-          //note: state = LOW means lights are off
-          //latch relay closed i.e. lights on
-          digitalWrite(relayPin, LOW);            
-        }
-        else{/*cbf*/}
-        //Let's reset the stop-time so the light never dies
-        stopTimeFlag = 1;  
+        flag = 1;
+
+      beepFor(1);
       
-      lastMicros = micros();
+    Serial.println(F("End of ISR"));
+    lastMicros = micros();
   }
   else{/*cbf*/}
 } //End of ISR0 Function
@@ -187,3 +138,48 @@ void blinkFor(int n){
   }
   digitalWrite(ledPin, LOW); //idle
 }
+
+void stuff(){
+      DateTime now = rtc.now();
+    
+    Serial.print(now.year(), DEC);
+    Serial.print('/');
+    Serial.print(now.month(), DEC);
+    Serial.print('/');
+    Serial.print(now.day(), DEC);
+    Serial.print(" (");
+    Serial.print(daysOfTheWeek[now.dayOfTheWeek()]);
+    Serial.print(") ");
+    Serial.print(now.hour(), DEC);
+    Serial.print(':');
+    Serial.print(now.minute(), DEC);
+    Serial.print(':');
+    Serial.print(now.second(), DEC);
+    Serial.println();
+    
+    Serial.print(" since midnight 1/1/1970 = ");
+    Serial.print(now.unixtime());
+    Serial.print("s = ");
+    Serial.print(now.unixtime() / 86400L);
+    Serial.println("d");
+    
+    // calculate a date which is 7 days and 30 seconds into the future
+    DateTime future (now + TimeSpan(7,12,30,6));
+    
+    Serial.print(" now + 7d + 30s: ");
+    Serial.print(future.year(), DEC);
+    Serial.print('/');
+    Serial.print(future.month(), DEC);
+    Serial.print('/');
+    Serial.print(future.day(), DEC);
+    Serial.print(' ');
+    Serial.print(future.hour(), DEC);
+    Serial.print(':');
+    Serial.print(future.minute(), DEC);
+    Serial.print(':');
+    Serial.print(future.second(), DEC);
+    Serial.println();
+    
+    Serial.println();
+}
+
