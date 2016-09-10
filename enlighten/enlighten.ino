@@ -14,11 +14,6 @@
 #include <Wire.h>
 #include "RTClib.h"
 
-RTC_DS3231 rtc;
-
-//Set delay in minutes
-int DelayMins = 2;
-
 //Declare variables for Relay
 const byte relayPin = 5;
 
@@ -39,12 +34,20 @@ const long debounceTime = 300; //millis
 volatile unsigned long lastMicros;
 
 //Declare Flags for ISR
-int stopTimeFlag = 0;
+boolean setTimerFlag = false;
+
+
+//Set RTC type
+RTC_DS3231 rtc;
+
+//Set delay in minutes
+const int DelayMins = 2;
+const int minuteOverflow = 60 - DelayMins;
+boolean minuteOverflowFlag = false;
+boolean timeOutFlag = false;
 
 DateTime stopTime;
 DateTime now;
-volatile long int TimeToStop = 0;
-volatile long int TimeNow = 0;
 
 void setup () {
 
@@ -70,7 +73,7 @@ void setup () {
 
    //Initialise Beeper Output Pin
    pinMode(beeperPin, OUTPUT);
-   beepFor(2);
+//   beepFor(2);
    
    //Initialise Relay Output Pin
    pinMode(relayPin, OUTPUT);
@@ -102,16 +105,19 @@ void loop () {
 
     //Set time stamp for reference
     now = rtc.now();  
-    //Convert to seconds for comparison
-    TimeNow = now.hour()*3600 + now.minute() * 60 + now.second();
 
-    if (stopTimeFlag){
+    if (setTimerFlag){
       state = HIGH;
       //Set time-stamp for when to stop
       stopTime = rtc.now() +  TimeSpan(0,0, DelayMins ,0);
-      //Convert to seconds for comparison
-      TimeToStop = stopTime.hour()*3600 + stopTime.minute() * 60 + stopTime.second();
-      stopTimeFlag = 0;
+      //Check for timer overflow scenario
+        if ( stopTime.minute() >= minuteOverflow ){
+          minuteOverflowFlag = true;
+        } 
+        else{
+          minuteOverflowFlag = false;
+        }
+      setTimerFlag = false;
     }
     else{
 
@@ -123,12 +129,18 @@ void loop () {
 }
 
 void TISR () {
-  Serial.print("The Time Now is ");
-  Serial.println(TimeNow);
-  Serial.print("The Stop Time is ");
-  Serial.println(TimeToStop);
+
+  if (minuteOverflowFlag && (now.minute() < stopTime.minute())){
+    timeOutFlag = true;
+  }
+  else if (!(minuteOverflowFlag) && (now.minute() > stopTime.minute())){
+    timeOutFlag = true;
+  }
+  else{
+    timeOutFlag = false;
+  }
   
-  if ( (TimeNow > TimeToStop) && (state == LOW) ){        
+  if ( timeOutFlag && (state == LOW) ){        
     //Latch relay open i.e. lights off
     digitalWrite(relayPin, HIGH);
   }
@@ -157,7 +169,7 @@ void ISR0 () {
         }
         else{/*cbf*/}
         //Let's reset the stop-time so the light never dies
-        stopTimeFlag = 1;  
+        setTimerFlag = true;  
       
       lastMicros = micros();
   }
