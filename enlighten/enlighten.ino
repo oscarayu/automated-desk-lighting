@@ -123,7 +123,11 @@ void loop () {
 }
 
 void TISR () {
-
+  Serial.print("The Time Now is ");
+  Serial.println(TimeNow);
+  Serial.print("The Stop Time is ");
+  Serial.println(TimeToStop);
+  
   if ( (TimeNow > TimeToStop) && (state == LOW) ){        
     //Latch relay open i.e. lights off
     digitalWrite(relayPin, HIGH);
