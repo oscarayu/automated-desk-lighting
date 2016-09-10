@@ -17,7 +17,7 @@
 RTC_DS3231 rtc;
 
 //Set delay in minutes
-int DelayMins = 10;
+int DelayMins = 3;
 
 //Declare variables for Relay
 const byte relayPin = 5;
@@ -128,12 +128,12 @@ void TISR () {
     //Latch relay open i.e. lights off
     digitalWrite(relayPin, HIGH);  
   }
-  else if ( (TimeNow + 10) > TimeToStop ) {
+  else if ( (TimeToStop - TimeNow) < 10 && (TimeToStop - TimeNow) > 0 ) {
     /*
     * If elapsed time is 10 seconds from
     * the stop-time, sound a warning
     */    
-    beepFor(2);
+    beepFor(3);
   }
   else{}   
   
