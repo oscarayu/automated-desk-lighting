@@ -128,13 +128,6 @@ void TISR () {
     //Latch relay open i.e. lights off
     digitalWrite(relayPin, HIGH);  
   }
-  else if ( (TimeToStop - TimeNow) < 10 && (TimeToStop - TimeNow) > 0 ) {
-    /*
-    * If elapsed time is 10 seconds from
-    * the stop-time, sound a warning
-    */    
-    beepFor(3);
-  }
   else{}   
   
 } // End of TISR
