@@ -20,8 +20,6 @@ const byte relayPin = 5;
 //Declare variables for external interrupt (PIR sensor)
 const byte beeperPin = 8;
 volatile byte beeperState = LOW;
-const byte ledPin = 13; //PIR Status indicator
-volatile byte ledState = LOW;
 const byte interruptPin = 2; //PIR Sensor Pin
 //Note: Arduino Uno interrupt pin is on pin 2
 volatile byte state = LOW; //PIR STATE
@@ -73,7 +71,7 @@ void setup () {
 
    //Initialise Beeper Output Pin
    pinMode(beeperPin, OUTPUT);
-//   beepFor(2);
+//   beepFor(1);
    
    //Initialise Relay Output Pin
    pinMode(relayPin, OUTPUT);
@@ -152,9 +150,7 @@ void ISR0 () {
   //Interrupt Service Routine, as triggered by external interrupt pin
   // If-statement here is for software debouncing
   if((long)( micros() - lastMicros) >= debounceTime*1000){
-         
-      blinkFor(3); //blink LED to notify ISR triggered
-      
+               
 //      Serial.println(F("ISR triggered"));
 
       /*
@@ -185,15 +181,4 @@ void beepFor(int n){
     delay(100);
   }
   digitalWrite(beeperPin, LOW); //ok, that's enough
-}
-
-void blinkFor(int n){
-  ledState = LOW; //Force Start LOW
-  n = 2*n; //A single-blink has both rise and fall edges
-  for(i = 0; i < n; i++){
-    ledState = !ledState;
-    digitalWrite(ledPin, ledState);
-    delay(500);
-  }
-  digitalWrite(ledPin, LOW); //idle
 }
