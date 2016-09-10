@@ -40,8 +40,9 @@ RTC_DS3231 rtc;
 
 //Set delay in minutes
 const int DelayMins = 2;
-const int minuteOverflow = 60 - DelayMins;
-boolean minuteOverflowFlag = false;
+const int TISR_PERIOD = 3;
+const int secondsOverflow = 60 - TISR_PERIOD;
+boolean timerOverflowFlag = false;
 boolean timeOutFlag = false;
 
 DateTime stopTime;
@@ -84,7 +85,7 @@ void setup () {
    stopTime = rtc.now();
 
    //Attach Timer Interrupt
-   Timer1.initialize(2500000); // handle is Period in microseconds
+   Timer1.initialize(TISR_PERIOD * 1000000); // handle is Period in microseconds
    Timer1.attachInterrupt(TISR); //Timer Interrupt Service Routine
    //Attach External Interrupt Pin to Interrupt Service Routine
    attachInterrupt(digitalPinToInterrupt(interruptPin), ISR0, RISING);
@@ -109,11 +110,11 @@ void loop () {
       //Set time-stamp for when to stop
       stopTime = rtc.now() +  TimeSpan(0,0, DelayMins ,0);
       //Check for timer overflow scenario
-        if ( stopTime.minute() >= minuteOverflow ){
-          minuteOverflowFlag = true;
+        if ( stopTime.minute() == 59 && stopTime.second() >= secondsOverflow ){
+          timerOverflowFlag = true;
         } 
         else{
-          minuteOverflowFlag = false;
+          timerOverflowFlag = false;
         }
       setTimerFlag = false;
     }
@@ -128,10 +129,10 @@ void loop () {
 
 void TISR () {
 
-  if (minuteOverflowFlag && (now.minute() < stopTime.minute())){
+  if (timerOverflowFlag && (now.minute() > (DelayMins - 1) ) ){
     timeOutFlag = true;
   }
-  else if (!(minuteOverflowFlag) && (now.minute() > stopTime.minute())){
+  else if (!(timerOverflowFlag) && (now.minute() > stopTime.minute())){
     timeOutFlag = true;
   }
   else{
