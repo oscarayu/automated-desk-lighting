@@ -17,7 +17,7 @@
 RTC_DS3231 rtc;
 
 //Set delay in minutes
-int DelayMins = 3;
+int DelayMins = 2;
 
 //Declare variables for Relay
 const byte relayPin = 5;
@@ -126,7 +126,8 @@ void TISR () {
 
   if ( (TimeNow > TimeToStop) && (state == LOW) ){        
     //Latch relay open i.e. lights off
-    digitalWrite(relayPin, HIGH);  
+    digitalWrite(relayPin, HIGH);
+    beepFor(10);  
   }
   else{}   
   
@@ -166,13 +167,14 @@ void beepFor(int n){
   for(i = 0; i < n; i++){
     beeperState = !beeperState;
     digitalWrite(beeperPin, beeperState);
-    delay(100);
+    delay(200);
   }
   digitalWrite(beeperPin, LOW); //ok, that's enough
 }
 
 void blinkFor(int n){
   ledState = LOW; //Force Start LOW
+  n = 2*n; //A single-blink has both rise and fall edges
   for(i = 0; i < n; i++){
     ledState = !ledState;
     digitalWrite(ledPin, ledState);
