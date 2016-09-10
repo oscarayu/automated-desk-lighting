@@ -127,7 +127,6 @@ void TISR () {
   if ( (TimeNow > TimeToStop) && (state == LOW) ){        
     //Latch relay open i.e. lights off
     digitalWrite(relayPin, HIGH);
-    beepFor(10);  
   }
   else{}   
   
@@ -167,7 +166,7 @@ void beepFor(int n){
   for(i = 0; i < n; i++){
     beeperState = !beeperState;
     digitalWrite(beeperPin, beeperState);
-    delay(200);
+    delay(100);
   }
   digitalWrite(beeperPin, LOW); //ok, that's enough
 }
