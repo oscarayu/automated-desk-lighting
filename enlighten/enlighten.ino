@@ -39,9 +39,8 @@ boolean setTimerFlag = false;
 RTC_DS3231 rtc;
 
 //Set delay in minutes
-const int DelayMins = 2;
-const int TISR_PERIOD = 3;
-const int secondsOverflow = 60 - TISR_PERIOD;
+const int DelayMins = 2; //Minutes
+const int TISR_PERIOD = 2; //seconds
 boolean timerOverflowFlag = false;
 boolean timeOutFlag = false;
 
@@ -110,7 +109,7 @@ void loop () {
       //Set time-stamp for when to stop
       stopTime = rtc.now() +  TimeSpan(0,0, DelayMins ,0);
       //Check for timer overflow scenario
-        if ( stopTime.minute() == 59 && stopTime.second() >= secondsOverflow ){
+        if ( stopTime.minute() == 59 ){
           timerOverflowFlag = true;
         } 
         else{
