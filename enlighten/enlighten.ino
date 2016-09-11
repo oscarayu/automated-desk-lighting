@@ -22,7 +22,6 @@ const byte beeperPin = 8;
 volatile byte beeperState = LOW;
 const byte interruptPin = 2; //PIR Sensor Pin
 //Note: Arduino Uno interrupt pin is on pin 2
-volatile byte state = LOW; //PIR STATE
 
 //Declare loop counter
 int i = 0;
@@ -33,6 +32,7 @@ volatile unsigned long lastMicros;
 
 //Declare Flags for ISR
 boolean setTimerFlag = false;
+boolean newStopTime = false;
 
 
 //Set RTC type
@@ -40,6 +40,7 @@ RTC_DS3231 rtc;
 
 //Set delay in minutes
 const int DelayMins = 2; //Minutes
+const int timerOverflow = 60 - DelayMins; //Minutes
 const int TISR_PERIOD = 2; //seconds
 boolean timerOverflowFlag = false;
 boolean timeOutFlag = false;
@@ -71,7 +72,7 @@ void setup () {
 
    //Initialise Beeper Output Pin
    pinMode(beeperPin, OUTPUT);
-//   beepFor(1);
+   beepFor(1);
    
    //Initialise Relay Output Pin
    pinMode(relayPin, OUTPUT);
@@ -101,21 +102,28 @@ void loop () {
 
     //Fetch current time from RTC
     now = rtc.now();  
-    
-    //Check for timer overflow scenario
-    if ( now.minute() == 59 ){
-      timerOverflowFlag = true;
-    } 
-    else{}    
+    //hourly chime
+    if (now.minute() == timerOverflow && now.second() == 0) {
+      beepFor(2);
+    }    
+    else{}   
 
     if (setTimerFlag){
       //Set time-stamp for when to stop
       stopTime = rtc.now() +  TimeSpan(0,0, DelayMins ,0);
       setTimerFlag = false;
-      state = HIGH;
+      newStopTime = true;
+      
+      //Check for timer overflow scenario
+      if ( now.minute() >= timerOverflow ){
+        timerOverflowFlag = true;
+      } 
+      else{
+        timerOverflowFlag = false;       
+      }
     }
     else{
-      state = LOW;
+      newStopTime = false;
     }
     
     delay(1000);
@@ -123,24 +131,26 @@ void loop () {
 
 void TISR () {
 
-  if (timerOverflowFlag && (now.minute() >= DelayMins) && (now.minute() < (60 - DelayMins) ) ){
-    //No motion detected, Timer timed-out. Flag it to turn off
-    timeOutFlag = true;
-    //Overflow scenario surpassed. Reset overflow flag.
-    timerOverflowFlag = false;
+  /*
+   * Only compare stop-time to the current time if stop-time was
+   * NOT set during a timer overflow condition
+   */
+  if ( !(newStopTime) ){
+    
+      if (!(timerOverflowFlag) && (now.minute() > stopTime.minute())){
+        timeOutFlag = true;
+      }
+      else{
+        timeOutFlag = false;
+      }    
+      
+      if ( timeOutFlag ){        
+        //Latch relay open i.e. lights off
+        digitalWrite(relayPin, HIGH);
+      }
+      else{}       
   }
-  else if (!(timerOverflowFlag) && (now.minute() > stopTime.minute())){
-    timeOutFlag = true;
-  }
-  else{
-    timeOutFlag = false;
-  }
-  
-  if ( timeOutFlag && (state == LOW) ){        
-    //Latch relay open i.e. lights off
-    digitalWrite(relayPin, HIGH);
-  }
-  else{}   
+  else{}
   
 } // End of TISR
 
@@ -156,12 +166,12 @@ void ISR0 () {
        * i.e. if they are already on, then we don't need to 
        * digitalWrite to it; just reset the stop-time (flag).
        */
-        if ( state == LOW ){         
-          //note: state = LOW means lights are off
+        if ( digitalRead(relayPin) == HIGH ){         
           //latch relay closed i.e. lights on
           digitalWrite(relayPin, LOW);      
         }
         else{/*cbf*/}
+        
         //Let's reset the stop-time so the light never dies
         setTimerFlag = true;  
       
