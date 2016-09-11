@@ -14,22 +14,14 @@
 #include <Wire.h>
 #include "RTClib.h"
 
-RTC_DS3231 rtc;
-
-//Set delay in minutes
-int DelayMins = 2;
-
 //Declare variables for Relay
 const byte relayPin = 5;
 
 //Declare variables for external interrupt (PIR sensor)
 const byte beeperPin = 8;
 volatile byte beeperState = LOW;
-const byte ledPin = 13; //PIR Status indicator
-volatile byte ledState = LOW;
 const byte interruptPin = 2; //PIR Sensor Pin
 //Note: Arduino Uno interrupt pin is on pin 2
-volatile byte state = LOW; //PIR STATE
 
 //Declare loop counter
 int i = 0;
@@ -39,12 +31,22 @@ const long debounceTime = 300; //millis
 volatile unsigned long lastMicros;
 
 //Declare Flags for ISR
-int stopTimeFlag = 0;
+boolean setTimerFlag = false;
+boolean newStopTime = false;
+
+
+//Set RTC type
+RTC_DS3231 rtc;
+
+//Set delay in minutes
+const int DelayMins = 2; //Minutes
+const int timerOverflow = 60 - DelayMins; //Minutes
+const int TISR_PERIOD = 2; //seconds
+boolean timerOverflowFlag = false;
+boolean timeOutFlag = false;
 
 DateTime stopTime;
 DateTime now;
-volatile long int TimeToStop = 0;
-volatile long int TimeNow = 0;
 
 void setup () {
 
@@ -70,7 +72,7 @@ void setup () {
 
    //Initialise Beeper Output Pin
    pinMode(beeperPin, OUTPUT);
-   beepFor(2);
+   beepFor(1);
    
    //Initialise Relay Output Pin
    pinMode(relayPin, OUTPUT);
@@ -83,7 +85,7 @@ void setup () {
    stopTime = rtc.now();
 
    //Attach Timer Interrupt
-   Timer1.initialize(2500000); // handle is Period in microseconds
+   Timer1.initialize(TISR_PERIOD * 1000000); // handle is Period in microseconds
    Timer1.attachInterrupt(TISR); //Timer Interrupt Service Routine
    //Attach External Interrupt Pin to Interrupt Service Routine
    attachInterrupt(digitalPinToInterrupt(interruptPin), ISR0, RISING);
@@ -97,42 +99,58 @@ void loop () {
      * Need to use flags
      * GG, no power saving
      */
-    
-//    Serial.println(digitalRead(interruptPin));
 
-    //Set time stamp for reference
+    //Fetch current time from RTC
     now = rtc.now();  
-    //Convert to seconds for comparison
-    TimeNow = now.hour()*3600 + now.minute() * 60 + now.second();
+    //hourly chime
+    if (now.minute() == timerOverflow && now.second() == 0) {
+      beepFor(2);
+    }    
+    else{}   
 
-    if (stopTimeFlag){
-      state = HIGH;
+    if (setTimerFlag){
       //Set time-stamp for when to stop
       stopTime = rtc.now() +  TimeSpan(0,0, DelayMins ,0);
-      //Convert to seconds for comparison
-      TimeToStop = stopTime.hour()*3600 + stopTime.minute() * 60 + stopTime.second();
-      stopTimeFlag = 0;
+      setTimerFlag = false;
+      newStopTime = true;
+      
+      //Check for timer overflow scenario
+      if ( now.minute() >= timerOverflow ){
+        timerOverflowFlag = true;
+      } 
+      else{
+        timerOverflowFlag = false;       
+      }
     }
     else{
-
-      state = LOW;
-      
+      newStopTime = false;
     }
     
     delay(1000);
 }
 
 void TISR () {
-  Serial.print("The Time Now is ");
-  Serial.println(TimeNow);
-  Serial.print("The Stop Time is ");
-  Serial.println(TimeToStop);
-  
-  if ( (TimeNow > TimeToStop) && (state == LOW) ){        
-    //Latch relay open i.e. lights off
-    digitalWrite(relayPin, HIGH);
+
+  /*
+   * Only compare stop-time to the current time if stop-time was
+   * NOT set during a timer overflow condition
+   */
+  if ( !(newStopTime) ){
+    
+      if (!(timerOverflowFlag) && (now.minute() > stopTime.minute())){
+        timeOutFlag = true;
+      }
+      else{
+        timeOutFlag = false;
+      }    
+      
+      if ( timeOutFlag ){        
+        //Latch relay open i.e. lights off
+        digitalWrite(relayPin, HIGH);
+      }
+      else{}       
   }
-  else{}   
+  else{}
   
 } // End of TISR
 
@@ -140,9 +158,7 @@ void ISR0 () {
   //Interrupt Service Routine, as triggered by external interrupt pin
   // If-statement here is for software debouncing
   if((long)( micros() - lastMicros) >= debounceTime*1000){
-         
-      blinkFor(3); //blink LED to notify ISR triggered
-      
+               
 //      Serial.println(F("ISR triggered"));
 
       /*
@@ -150,14 +166,14 @@ void ISR0 () {
        * i.e. if they are already on, then we don't need to 
        * digitalWrite to it; just reset the stop-time (flag).
        */
-        if ( state == LOW ){         
-          //note: state = LOW means lights are off
+        if ( digitalRead(relayPin) == HIGH ){         
           //latch relay closed i.e. lights on
-          digitalWrite(relayPin, LOW);            
+          digitalWrite(relayPin, LOW);      
         }
         else{/*cbf*/}
+        
         //Let's reset the stop-time so the light never dies
-        stopTimeFlag = 1;  
+        setTimerFlag = true;  
       
       lastMicros = micros();
   }
@@ -173,15 +189,4 @@ void beepFor(int n){
     delay(100);
   }
   digitalWrite(beeperPin, LOW); //ok, that's enough
-}
-
-void blinkFor(int n){
-  ledState = LOW; //Force Start LOW
-  n = 2*n; //A single-blink has both rise and fall edges
-  for(i = 0; i < n; i++){
-    ledState = !ledState;
-    digitalWrite(ledPin, ledState);
-    delay(500);
-  }
-  digitalWrite(ledPin, LOW); //idle
 }
