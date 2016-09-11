@@ -129,7 +129,7 @@ void loop () {
 
 void TISR () {
 
-  if (timerOverflowFlag && (now.minute() > (DelayMins - 1) ) ){
+  if (timerOverflowFlag && (now.minute() >= DelayMins) && (now.minute() < (60 - DelayMins) ) ){
     timeOutFlag = true;
   }
   else if (!(timerOverflowFlag) && (now.minute() > stopTime.minute())){
