@@ -98,29 +98,24 @@ void loop () {
      * Need to use flags
      * GG, no power saving
      */
-    
-//    Serial.println(digitalRead(interruptPin));
 
-    //Set time stamp for reference
+    //Fetch current time from RTC
     now = rtc.now();  
+    
+    //Check for timer overflow scenario
+    if ( now.minute() == 59 ){
+      timerOverflowFlag = true;
+    } 
+    else{}    
 
     if (setTimerFlag){
-      state = HIGH;
       //Set time-stamp for when to stop
       stopTime = rtc.now() +  TimeSpan(0,0, DelayMins ,0);
-      //Check for timer overflow scenario
-        if ( stopTime.minute() == 59 ){
-          timerOverflowFlag = true;
-        } 
-        else{
-          timerOverflowFlag = false;
-        }
       setTimerFlag = false;
+      state = HIGH;
     }
     else{
-
       state = LOW;
-      
     }
     
     delay(1000);
@@ -129,7 +124,10 @@ void loop () {
 void TISR () {
 
   if (timerOverflowFlag && (now.minute() >= DelayMins) && (now.minute() < (60 - DelayMins) ) ){
+    //No motion detected, Timer timed-out. Flag it to turn off
     timeOutFlag = true;
+    //Overflow scenario surpassed. Reset overflow flag.
+    timerOverflowFlag = false;
   }
   else if (!(timerOverflowFlag) && (now.minute() > stopTime.minute())){
     timeOutFlag = true;
@@ -161,7 +159,7 @@ void ISR0 () {
         if ( state == LOW ){         
           //note: state = LOW means lights are off
           //latch relay closed i.e. lights on
-          digitalWrite(relayPin, LOW);            
+          digitalWrite(relayPin, LOW);      
         }
         else{/*cbf*/}
         //Let's reset the stop-time so the light never dies
