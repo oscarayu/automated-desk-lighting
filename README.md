@@ -9,8 +9,8 @@ Basic lighting automation system
 * SPST switch
 
 ## To Do
-* ~Motion-triggering via PIR~
-* ~Time-out via RTC~
+* ~~Motion-triggering via PIR~~
+* ~~Time-out via RTC~~
 * Fade-In Fade-Out via PWM
 * Brightness Level Control
 * Security and Logging mode
